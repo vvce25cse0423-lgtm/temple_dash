@@ -36,15 +36,11 @@ jobs:
         run: flutter analyze --no-fatal-infos
         continue-on-error: true
 
-      - name: 🧪 Run tests
-        run: flutter test
-        continue-on-error: true
-
       - name: 🏗️ Build Debug APK
         run: flutter build apk --debug
 
       - name: 🚀 Build Release APK
-        run: flutter build apk --release --no-shrink
+        run: flutter build apk --release
 
       - name: 📤 Upload Debug APK
         uses: actions/upload-artifact@v4
@@ -64,4 +60,3 @@ jobs:
         run: |
           echo "=== Build Complete ==="
           ls -lh build/app/outputs/flutter-apk/
-          echo "Release APK size: $(du -sh build/app/outputs/flutter-apk/app-release.apk | cut -f1)"

@@ -340,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Switch(
             value: value,
             onChanged: (_) {},
-            activeThumbColor: AppColors.gold,
+            activeColor: AppColors.gold,
           ),
         ],
       ),
