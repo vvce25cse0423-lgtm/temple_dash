@@ -522,7 +522,7 @@ class GamePainter extends CustomPainter {
     _paint.color = isDead ? Colors.red : Colors.white;
     canvas.drawOval(Rect.fromLTWH(px - 9, py + 8, 7, 8), _paint);
     canvas.drawOval(Rect.fromLTWH(px + 2, py + 8, 7, 8), _paint);
-    _paint.color = isDead ? Colors.darkRed : Colors.black87;
+    _paint.color = isDead ? const Color(0xFF8B0000) : Colors.black87;
     canvas.drawCircle(Offset(px - 5.5, py + 12), 3, _paint);
     canvas.drawCircle(Offset(px + 5.5, py + 12), 3, _paint);
 
