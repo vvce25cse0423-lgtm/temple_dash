@@ -7,221 +7,213 @@ import '../utils/constants.dart';
 class GamePainter extends CustomPainter {
   final GameEngine engine;
   final double animationValue;
-  final Paint _paint = Paint();
+  final Paint _paint = Paint()..isAntiAlias = true;
 
   GamePainter(this.engine, this.animationValue);
 
+  double get _groundY => GameConfig.gameHeight * 0.72;
+
   @override
   void paint(Canvas canvas, Size size) {
-    _drawBackground(canvas, size);
-    _drawTrees(canvas, size);
-    _drawTrack(canvas, size);
-    _drawLaneMarkers(canvas, size);
-    _drawCoins(canvas);
+    // Scale canvas to game resolution
+    final scaleX = size.width / GameConfig.gameWidth;
+    final scaleY = size.height / GameConfig.gameHeight;
+    canvas.save();
+    canvas.scale(scaleX, scaleY);
+
+    _drawBackground(canvas);
+    _drawTrees(canvas);
+    _drawTrack(canvas);
+    _drawLaneMarkers(canvas);
     _drawPowerUps(canvas);
+    _drawCoins(canvas);
     _drawObstacles(canvas);
-    _drawPlayer(canvas, size);
+    _drawPlayer(canvas);
     _drawParticles(canvas);
+
+    canvas.restore();
   }
 
-  void _drawBackground(Canvas canvas, Size size) {
+  // ─────────────────────────────────────────────
+  // BACKGROUND
+  // ─────────────────────────────────────────────
+  void _drawBackground(Canvas canvas) {
+    final w = GameConfig.gameWidth;
+    final h = GameConfig.gameHeight;
+
     // Sky gradient
-    final skyRect = Rect.fromLTWH(0, 0, size.width, size.height * 0.6);
-    final skyGradient = LinearGradient(
+    _paint.shader = const LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: [
-        const Color(0xFF0D0221),
-        const Color(0xFF1A0A00),
-        const Color(0xFF3D1C02),
-      ],
-    );
-    _paint.shader = skyGradient.createShader(skyRect);
-    canvas.drawRect(skyRect, _paint);
+      colors: [Color(0xFF0A001A), Color(0xFF1A0533), Color(0xFF2D0A00)],
+    ).createShader(Rect.fromLTWH(0, 0, w, h * 0.72));
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h * 0.72), _paint);
     _paint.shader = null;
 
     // Stars
-    _paint.color = Colors.white.withOpacity(0.6);
-    final rand = Random(42);
-    for (int i = 0; i < 80; i++) {
-      final sx = rand.nextDouble() * size.width;
-      final sy = rand.nextDouble() * size.height * 0.5;
-      final ss = rand.nextDouble() * 2 + 0.5;
-      final blink = (sin(animationValue * 3 + i) + 1) / 2;
-      _paint.color = Colors.white.withOpacity(0.3 + blink * 0.4);
-      canvas.drawCircle(Offset(sx, sy), ss, _paint);
+    final rng = Random(42);
+    for (int i = 0; i < 60; i++) {
+      final sx = rng.nextDouble() * w;
+      final sy = rng.nextDouble() * h * 0.55;
+      final blink = (sin(animationValue * 3 + i * 1.3) + 1) / 2;
+      _paint.color = Colors.white.withOpacity(0.3 + blink * 0.5);
+      canvas.drawCircle(Offset(sx, sy), rng.nextDouble() * 1.2 + 0.4, _paint);
     }
 
     // Moon
-    _paint.color = const Color(0xFFFFF8DC);
-    canvas.drawCircle(const Offset(300, 60), 30, _paint);
-    _paint.color = const Color(0xFF1A0A00);
-    canvas.drawCircle(const Offset(310, 55), 26, _paint);
+    _paint.color = const Color(0xFFFFF5CC);
+    canvas.drawCircle(const Offset(320, 55), 28, _paint);
+    _paint.color = const Color(0xFF1A0533);
+    canvas.drawCircle(const Offset(330, 50), 23, _paint);
 
-    // Distant temple silhouette
-    _drawTempleSilhouette(canvas, size);
+    // Temple silhouette
+    _drawTempleSilhouette(canvas, w, h * 0.58);
   }
 
-  void _drawTempleSilhouette(Canvas canvas, Size size) {
-    final groundY = size.height * 0.55;
-    _paint.color = const Color(0xFF0D0818).withOpacity(0.8);
+  void _drawTempleSilhouette(Canvas canvas, double w, double groundY) {
+    _paint.color = const Color(0xFF0D0020).withOpacity(0.9);
+    final cx = w / 2;
 
-    // Temple body
-    final templeRect = Rect.fromLTWH(size.width * 0.3, groundY - 80, size.width * 0.4, 80);
-    canvas.drawRect(templeRect, _paint);
+    // Base
+    canvas.drawRect(Rect.fromLTWH(cx - 90, groundY - 70, 180, 70), _paint);
 
     // Pillars
     for (int i = 0; i < 5; i++) {
-      final px = size.width * 0.32 + i * (size.width * 0.38 / 4);
-      canvas.drawRect(Rect.fromLTWH(px, groundY - 90, 10, 90), _paint);
+      canvas.drawRect(Rect.fromLTWH(cx - 82 + i * 40, groundY - 80, 12, 80), _paint);
     }
 
     // Roof tiers
-    _drawRoofTier(canvas, size.width * 0.28, groundY - 80, size.width * 0.44, 25);
-    _drawRoofTier(canvas, size.width * 0.33, groundY - 105, size.width * 0.34, 20);
-    _drawRoofTier(canvas, size.width * 0.38, groundY - 125, size.width * 0.24, 18);
+    _drawRoofTier(canvas, cx, groundY - 70, 200, 22);
+    _drawRoofTier(canvas, cx, groundY - 92, 150, 18);
+    _drawRoofTier(canvas, cx, groundY - 110, 100, 16);
 
     // Spire
-    final path = Path();
-    path.moveTo(size.width * 0.5, groundY - 155);
-    path.lineTo(size.width * 0.48, groundY - 125);
-    path.lineTo(size.width * 0.52, groundY - 125);
-    path.close();
-    canvas.drawPath(path, _paint);
+    final sp = Path()
+      ..moveTo(cx, groundY - 145)
+      ..lineTo(cx - 10, groundY - 110)
+      ..lineTo(cx + 10, groundY - 110)
+      ..close();
+    canvas.drawPath(sp, _paint);
   }
 
-  void _drawRoofTier(Canvas canvas, double x, double y, double w, double h) {
-    final path = Path();
-    path.moveTo(x + w / 2, y - h);
-    path.lineTo(x, y);
-    path.lineTo(x + w, y);
-    path.close();
-    canvas.drawPath(path, _paint);
+  void _drawRoofTier(Canvas canvas, double cx, double y, double w, double h) {
+    final p = Path()
+      ..moveTo(cx, y - h)
+      ..lineTo(cx - w / 2, y)
+      ..lineTo(cx + w / 2, y)
+      ..close();
+    canvas.drawPath(p, _paint);
   }
 
-  void _drawTrees(Canvas canvas, Size size) {
-    final groundY = size.height * 0.72;
-    final offset = engine.treesOffset;
-
-    for (int i = -1; i <= 3; i++) {
-      final baseX = i * (size.width / 2) + offset % (size.width / 2);
-      _drawTree(canvas, baseX - 40, groundY - 20, 0.7);
-      _drawTree(canvas, baseX + size.width / 4 + 20, groundY - 15, 0.8);
+  // ─────────────────────────────────────────────
+  // TREES
+  // ─────────────────────────────────────────────
+  void _drawTrees(Canvas canvas) {
+    final offset = engine.treesOffset % (GameConfig.gameWidth * 0.6);
+    for (int i = -1; i <= 4; i++) {
+      _drawTree(canvas, i * GameConfig.gameWidth * 0.6 + offset - 30, _groundY - 10, 0.8);
+      _drawTree(canvas, i * GameConfig.gameWidth * 0.6 + offset + 200, _groundY - 5, 0.65);
     }
   }
 
-  void _drawTree(Canvas canvas, double x, double y, double scale) {
-    final h = 100 * scale;
-    final w = 50 * scale;
+  void _drawTree(Canvas canvas, double x, double groundY, double s) {
+    _paint.color = const Color(0xFF3D2010);
+    canvas.drawRect(Rect.fromLTWH(x - 5 * s, groundY - 35 * s, 10 * s, 35 * s), _paint);
 
-    // Trunk
-    _paint.color = const Color(0xFF4A2F1A);
-    canvas.drawRect(Rect.fromLTWH(x - 5 * scale, y - h * 0.3, 10 * scale, h * 0.3), _paint);
-
-    // Foliage layers
-    final colors = [
-      const Color(0xFF0B3D0B),
-      const Color(0xFF145214),
-      const Color(0xFF1A6B1A),
-    ];
-
+    final colors = [const Color(0xFF0B3D0B), const Color(0xFF145214), const Color(0xFF1F7A1F)];
     for (int i = 0; i < 3; i++) {
       _paint.color = colors[i];
-      final layerY = y - h * 0.25 - i * h * 0.22;
-      final layerW = w * (1.0 - i * 0.2);
-      final path = Path();
-      path.moveTo(x, layerY - h * 0.3);
-      path.lineTo(x - layerW / 2, layerY);
-      path.lineTo(x + layerW / 2, layerY);
-      path.close();
-      canvas.drawPath(path, _paint);
+      final ly = groundY - 28 * s - i * 22 * s;
+      final lw = (55 - i * 12) * s;
+      final p = Path()
+        ..moveTo(x, ly - 28 * s)
+        ..lineTo(x - lw / 2, ly)
+        ..lineTo(x + lw / 2, ly)
+        ..close();
+      canvas.drawPath(p, _paint);
     }
   }
 
-  void _drawTrack(Canvas canvas, Size size) {
-    final groundY = size.height * 0.72;
-    final trackBottom = size.height;
-    final trackWidth = GameConfig.laneWidth * 3 + 30;
-    final centerX = size.width / 2;
+  // ─────────────────────────────────────────────
+  // TRACK
+  // ─────────────────────────────────────────────
+  void _drawTrack(Canvas canvas) {
+    final w = GameConfig.gameWidth;
+    final h = GameConfig.gameHeight;
+    final gY = _groundY;
+    final cx = w / 2;
+    final tw = GameConfig.laneWidth * 3 + 20.0;
 
-    // Track base gradient
-    final trackRect = Rect.fromLTWH(
-      centerX - trackWidth / 2, groundY, trackWidth, trackBottom - groundY,
-    );
+    // Ground beyond track
+    _paint.color = const Color(0xFF0A1A05);
+    canvas.drawRect(Rect.fromLTWH(0, gY, w, h - gY), _paint);
 
+    // Track surface gradient
     _paint.shader = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        const Color(0xFF5C3A1E),
-        const Color(0xFF3D2010),
-        const Color(0xFF2A1508),
+        const Color(0xFF6B4A28),
+        const Color(0xFF4A3018),
+        const Color(0xFF2E1C0A),
       ],
-    ).createShader(trackRect);
-    canvas.drawRect(trackRect, _paint);
+    ).createShader(Rect.fromLTWH(cx - tw / 2, gY, tw, h - gY));
+    canvas.drawRect(Rect.fromLTWH(cx - tw / 2, gY, tw, h - gY), _paint);
     _paint.shader = null;
 
-    // Track tiles
-    final tileH = 60.0;
-    final tileOffset = engine.groundOffset % tileH;
-    _paint.color = const Color(0xFF6B4423).withOpacity(0.4);
-    _paint.strokeWidth = 1;
-    _paint.style = PaintingStyle.stroke;
-    for (double ty = groundY - tileOffset; ty < trackBottom; ty += tileH) {
-      canvas.drawLine(
-        Offset(centerX - trackWidth / 2, ty),
-        Offset(centerX + trackWidth / 2, ty),
-        _paint,
-      );
+    // Tile lines scrolling
+    final tileH = 55.0;
+    final tileOff = engine.groundOffset % tileH;
+    _paint
+      ..color = const Color(0xFF8B6040).withOpacity(0.35)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    for (double ty = gY - tileOff; ty < h; ty += tileH) {
+      canvas.drawLine(Offset(cx - tw / 2, ty), Offset(cx + tw / 2, ty), _paint);
     }
     _paint.style = PaintingStyle.fill;
 
-    // Track edges
-    _paint.color = const Color(0xFF8B5E3C);
-    _paint.strokeWidth = 3;
-    _paint.style = PaintingStyle.stroke;
-    canvas.drawLine(
-      Offset(centerX - trackWidth / 2, groundY),
-      Offset(centerX - trackWidth / 2, trackBottom),
-      _paint,
-    );
-    canvas.drawLine(
-      Offset(centerX + trackWidth / 2, groundY),
-      Offset(centerX + trackWidth / 2, trackBottom),
-      _paint,
-    );
+    // Track side borders
+    _paint
+      ..color = const Color(0xFFB87040)
+      ..strokeWidth = 4
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(Offset(cx - tw / 2, gY), Offset(cx - tw / 2, h), _paint);
+    canvas.drawLine(Offset(cx + tw / 2, gY), Offset(cx + tw / 2, h), _paint);
     _paint.style = PaintingStyle.fill;
 
-    // Fog
-    final fogRect = Rect.fromLTWH(0, groundY - 30, size.width, 60);
+    // Horizon glow
     _paint.shader = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        Colors.transparent,
-        const Color(0xFF1A0A00).withOpacity(0.3),
+        const Color(0xFFFF6600).withOpacity(0.18),
         Colors.transparent,
       ],
-    ).createShader(fogRect);
-    canvas.drawRect(fogRect, _paint);
+    ).createShader(Rect.fromLTWH(cx - tw / 2, gY - 25, tw, 50));
+    canvas.drawRect(Rect.fromLTWH(cx - tw / 2, gY - 25, tw, 50), _paint);
     _paint.shader = null;
   }
 
-  void _drawLaneMarkers(Canvas canvas, Size size) {
-    final groundY = size.height * 0.72;
-    final centerX = size.width / 2;
-    _paint.color = const Color(0xFFFFD700).withOpacity(0.15);
-    _paint.strokeWidth = 1.5;
-    _paint.style = PaintingStyle.stroke;
+  // ─────────────────────────────────────────────
+  // LANE MARKERS
+  // ─────────────────────────────────────────────
+  void _drawLaneMarkers(Canvas canvas) {
+    final gY = _groundY;
+    final h = GameConfig.gameHeight;
+    final cx = GameConfig.gameWidth / 2;
+    final dashH = 22.0;
+    final gapH = 14.0;
+    final off = engine.groundOffset % (dashH + gapH);
 
-    // Dashed lane lines
-    final dashH = 20.0;
-    final gapH = 15.0;
-    final laneOffset = engine.groundOffset % (dashH + gapH);
+    _paint
+      ..color = const Color(0xFFFFCC44).withOpacity(0.5)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
 
-    for (final lx in [centerX - GameConfig.laneWidth / 2, centerX + GameConfig.laneWidth / 2]) {
-      double y = groundY - laneOffset;
-      while (y < size.height) {
+    for (final lx in [cx - GameConfig.laneWidth / 2, cx + GameConfig.laneWidth / 2]) {
+      double y = gY - off;
+      while (y < h) {
         canvas.drawLine(Offset(lx, y), Offset(lx, y + dashH), _paint);
         y += dashH + gapH;
       }
@@ -229,227 +221,422 @@ class GamePainter extends CustomPainter {
     _paint.style = PaintingStyle.fill;
   }
 
+  // ─────────────────────────────────────────────
+  // COINS  – bright, large, unmissable
+  // ─────────────────────────────────────────────
   void _drawCoins(Canvas canvas) {
     for (final coin in engine.coins) {
       if (coin.isCollected) continue;
-      final pulse = (sin(animationValue * 4 + coin.x) + 1) / 2;
+
+      final cx = coin.x;
+      final cy = coin.y;
+      final pulse = (sin(animationValue * 5 + coin.x * 0.05) + 1) / 2;
+      final r = GameConfig.coinSize / 2 + 2;
 
       // Outer glow
-      _paint.color = AppColors.gold.withOpacity(0.3 + pulse * 0.2);
-      canvas.drawCircle(
-        Offset(coin.x, coin.y),
-        GameConfig.coinSize / 2 + 5 + pulse * 3,
-        _paint,
-      );
-
-      // Coin body
-      final gradient = RadialGradient(
-        colors: [const Color(0xFFFFEA00), AppColors.gold, const Color(0xFFB8860B)],
-        stops: const [0.0, 0.6, 1.0],
-      );
-      _paint.shader = gradient.createShader(
-        Rect.fromCircle(center: Offset(coin.x, coin.y), radius: GameConfig.coinSize / 2),
-      );
-      canvas.drawCircle(Offset(coin.x, coin.y), GameConfig.coinSize / 2, _paint);
+      _paint.shader = RadialGradient(colors: [
+        const Color(0xFFFFDD00).withOpacity(0.5 + pulse * 0.3),
+        Colors.transparent,
+      ]).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r + 10));
+      canvas.drawCircle(Offset(cx, cy), r + 10 + pulse * 4, _paint);
       _paint.shader = null;
 
-      // Symbol
-      final tp = TextPainter(
-        text: const TextSpan(text: '✦', style: TextStyle(fontSize: 12, color: Color(0xFF8B6914))),
-        textDirection: TextDirection.ltr,
-      );
-      tp.layout();
-      tp.paint(canvas, Offset(coin.x - tp.width / 2, coin.y - tp.height / 2));
+      // Coin body
+      _paint.shader = RadialGradient(
+        center: const Alignment(-0.4, -0.4),
+        colors: [const Color(0xFFFFFF88), const Color(0xFFFFCC00), const Color(0xFFAA7700)],
+      ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r));
+      canvas.drawCircle(Offset(cx, cy), r, _paint);
+      _paint.shader = null;
+
+      // Inner ring
+      _paint
+        ..color = const Color(0xFFFFEE44).withOpacity(0.6)
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke;
+      canvas.drawCircle(Offset(cx, cy), r * 0.65, _paint);
+      _paint.style = PaintingStyle.fill;
+
+      // Star symbol
+      _drawStar(canvas, cx, cy, 5, r * 0.35, r * 0.18, const Color(0xFFAA7700));
     }
   }
 
+  void _drawStar(Canvas canvas, double cx, double cy, int points, double outer, double inner, Color color) {
+    final path = Path();
+    final step = pi / points;
+    for (int i = 0; i < points * 2; i++) {
+      final angle = i * step - pi / 2;
+      final r = i.isEven ? outer : inner;
+      final x = cx + cos(angle) * r;
+      final y = cy + sin(angle) * r;
+      if (i == 0) path.moveTo(x, y);
+      else path.lineTo(x, y);
+    }
+    path.close();
+    _paint.color = color;
+    canvas.drawPath(path, _paint);
+  }
+
+  // ─────────────────────────────────────────────
+  // POWER-UPS
+  // ─────────────────────────────────────────────
   void _drawPowerUps(Canvas canvas) {
     for (final pu in engine.powerUps) {
       if (pu.isCollected) continue;
-      final pulse = (sin(animationValue * 5) + 1) / 2;
+      final pulse = (sin(animationValue * 4) + 1) / 2;
+      final cx = pu.x;
+      final cy = pu.y;
 
-      // Glow ring
-      _paint.color = pu.color.withOpacity(0.3 + pulse * 0.3);
-      canvas.drawCircle(Offset(pu.x, pu.y), 28 + pulse * 5, _paint);
+      // Outer glow ring
+      _paint.shader = RadialGradient(colors: [
+        pu.color.withOpacity(0.5 + pulse * 0.3),
+        Colors.transparent,
+      ]).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: 36));
+      canvas.drawCircle(Offset(cx, cy), 36 + pulse * 6, _paint);
+      _paint.shader = null;
 
-      // Background
-      _paint.color = pu.color.withOpacity(0.9);
-      canvas.drawCircle(Offset(pu.x, pu.y), 22, _paint);
+      // Body
+      _paint.shader = RadialGradient(
+        center: const Alignment(-0.3, -0.3),
+        colors: [
+          Color.lerp(pu.color, Colors.white, 0.5)!,
+          pu.color,
+          Color.lerp(pu.color, Colors.black, 0.3)!,
+        ],
+      ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: 22));
+      canvas.drawCircle(Offset(cx, cy), 22, _paint);
+      _paint.shader = null;
 
-      // Icon text
+      // Border
+      _paint
+        ..color = Colors.white.withOpacity(0.8)
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+      canvas.drawCircle(Offset(cx, cy), 22, _paint);
+      _paint.style = PaintingStyle.fill;
+
+      // Icon
       final icons = {
         PowerUpType.shield: '🛡',
         PowerUpType.magnet: '🧲',
         PowerUpType.speedBoost: '⚡',
         PowerUpType.doubleCoins: '💰',
       };
-      final tp = TextPainter(
-        text: TextSpan(text: icons[pu.type], style: const TextStyle(fontSize: 20)),
-        textDirection: TextDirection.ltr,
-      );
-      tp.layout();
-      tp.paint(canvas, Offset(pu.x - tp.width / 2, pu.y - tp.height / 2));
+      _drawEmoji(canvas, icons[pu.type]!, cx, cy, 22);
     }
   }
 
+  void _drawEmoji(Canvas canvas, String emoji, double cx, double cy, double size) {
+    final tp = TextPainter(
+      text: TextSpan(text: emoji, style: TextStyle(fontSize: size)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(cx - tp.width / 2, cy - tp.height / 2));
+  }
+
+  // ─────────────────────────────────────────────
+  // OBSTACLES  – vivid, contrasting, clearly visible
+  // ─────────────────────────────────────────────
   void _drawObstacles(Canvas canvas) {
     for (final obs in engine.obstacles) {
       if (!obs.isActive) continue;
       switch (obs.type) {
-        case ObstacleType.rock:
-          _drawRock(canvas, obs.x, obs.y);
-          break;
-        case ObstacleType.fire:
-          _drawFire(canvas, obs.x, obs.y);
-          break;
-        case ObstacleType.wall:
-          _drawWall(canvas, obs.x, obs.y);
-          break;
-        case ObstacleType.log:
-          _drawLog(canvas, obs.x, obs.y);
-          break;
+        case ObstacleType.rock:   _drawRock(canvas, obs.x, obs.y);   break;
+        case ObstacleType.fire:   _drawFire(canvas, obs.x, obs.y);   break;
+        case ObstacleType.wall:   _drawWall(canvas, obs.x, obs.y);   break;
+        case ObstacleType.log:    _drawLog(canvas, obs.x, obs.y);    break;
       }
     }
   }
 
+  // ROCK – bright cyan/white outline, obvious silhouette
   void _drawRock(Canvas canvas, double x, double y) {
-    final path = Path();
-    path.moveTo(x - 28, y + 35);
-    path.lineTo(x - 32, y + 5);
-    path.lineTo(x - 15, y - 30);
-    path.lineTo(x + 5, y - 38);
-    path.lineTo(x + 28, y - 20);
-    path.lineTo(x + 33, y + 15);
-    path.lineTo(x + 20, y + 35);
-    path.close();
+    final path = Path()
+      ..moveTo(x - 30, y + 38)
+      ..lineTo(x - 36, y + 8)
+      ..lineTo(x - 20, y - 28)
+      ..lineTo(x + 4, y - 40)
+      ..lineTo(x + 30, y - 22)
+      ..lineTo(x + 36, y + 12)
+      ..lineTo(x + 22, y + 38)
+      ..close();
 
+    // Drop shadow
+    _paint.color = Colors.black.withOpacity(0.5);
+    canvas.save();
+    canvas.translate(4, 6);
+    canvas.drawPath(path, _paint);
+    canvas.restore();
+
+    // Rock body
     _paint.shader = LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [const Color(0xFF8C8C8C), const Color(0xFF4A4A4A), const Color(0xFF2A2A2A)],
-    ).createShader(Rect.fromLTWH(x - 35, y - 40, 70, 80));
+      colors: [const Color(0xFFCCDDEE), const Color(0xFF7799BB), const Color(0xFF334466)],
+    ).createShader(Rect.fromLTWH(x - 38, y - 42, 76, 82));
     canvas.drawPath(path, _paint);
     _paint.shader = null;
 
-    _paint.color = const Color(0xFFAAAAAA).withOpacity(0.5);
-    _paint.style = PaintingStyle.stroke;
-    _paint.strokeWidth = 1.5;
+    // Bright outline – makes it pop against dark track
+    _paint
+      ..color = const Color(0xFFAADDFF)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
     canvas.drawPath(path, _paint);
     _paint.style = PaintingStyle.fill;
+
+    // Highlight crack
+    _paint
+      ..color = Colors.white.withOpacity(0.4)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    final crack = Path()
+      ..moveTo(x - 5, y - 25)
+      ..lineTo(x + 2, y - 5)
+      ..lineTo(x - 3, y + 10);
+    canvas.drawPath(crack, _paint);
+    _paint.style = PaintingStyle.fill;
+
+    // Warning label
+    _drawObstacleLabel(canvas, x, y - 52, '🪨', const Color(0xFF88CCFF));
   }
 
+  // FIRE – massive bright animated flames, impossible to miss
   void _drawFire(Canvas canvas, double x, double y) {
-    final pulse = (sin(animationValue * 8) + 1) / 2;
+    final t = animationValue;
 
-    // Base glow
-    _paint.color = AppColors.lava.withOpacity(0.3);
-    canvas.drawOval(Rect.fromCenter(center: Offset(x, y + 30), width: 70, height: 20), _paint);
+    // Base glow on ground
+    _paint.shader = RadialGradient(colors: [
+      const Color(0xFFFF4400).withOpacity(0.6),
+      Colors.transparent,
+    ]).createShader(Rect.fromCircle(center: Offset(x, y + 38), radius: 50));
+    canvas.drawOval(Rect.fromCenter(center: Offset(x, y + 38), width: 90, height: 28), _paint);
+    _paint.shader = null;
 
-    for (int i = 0; i < 3; i++) {
-      final offset = (i - 1) * 18.0;
-      final h = 65.0 + pulse * 15 + i * 8;
-      _drawFlame(canvas, x + offset, y, h, i == 1);
+    // Multiple flame layers for depth
+    _drawFlameLayer(canvas, x - 18, y, 70, 0.85, t, 0.8);
+    _drawFlameLayer(canvas, x + 18, y, 70, 0.85, t, 1.2);
+    _drawFlameLayer(canvas, x, y, 90, 1.0, t, 0.0);    // Center tallest flame
+
+    // Bright core
+    _paint.shader = LinearGradient(
+      begin: Alignment.bottomCenter,
+      end: Alignment.topCenter,
+      colors: [const Color(0xFFFFFFFF), const Color(0xFFFFFF88), const Color(0xFFFFCC00)],
+    ).createShader(Rect.fromLTWH(x - 12, y - 30, 24, 50));
+    final core = Path()
+      ..moveTo(x - 10, y + 38)
+      ..quadraticBezierTo(x - 14, y + 10, x, y - 30)
+      ..quadraticBezierTo(x + 14, y + 10, x + 10, y + 38)
+      ..close();
+    canvas.drawPath(core, _paint);
+    _paint.shader = null;
+
+    // Ember particles
+    for (int i = 0; i < 5; i++) {
+      final ex = x + sin(t * 6 + i * 1.3) * 25;
+      final ey = y - 50 - (t * 3 + i * 0.4) % 1.0 * 40;
+      final es = 3.0 - i * 0.4;
+      _paint.color = [
+        const Color(0xFFFF4400),
+        const Color(0xFFFF8800),
+        const Color(0xFFFFCC00),
+      ][i % 3].withOpacity(0.8);
+      canvas.drawCircle(Offset(ex, ey), es, _paint);
     }
+
+    _drawObstacleLabel(canvas, x, y - 102, '🔥', const Color(0xFFFF8800));
   }
 
-  void _drawFlame(Canvas canvas, double x, double y, double h, bool main) {
-    final path = Path();
-    path.moveTo(x - 18, y + 35);
-    path.quadraticBezierTo(x - 22, y, x, y - h);
-    path.quadraticBezierTo(x + 22, y, x + 18, y + 35);
-    path.close();
+  void _drawFlameLayer(Canvas canvas, double x, double y, double h, double w, double t, double phase) {
+    final sway = sin(t * 7 + phase) * 10;
+    final flicker = (sin(t * 11 + phase) + 1) / 2;
+    final fh = h + flicker * 15;
+
+    final path = Path()
+      ..moveTo(x - 20 * w, y + 38)
+      ..quadraticBezierTo(x - 25 * w + sway, y, x + sway * 0.5, y - fh)
+      ..quadraticBezierTo(x + 25 * w + sway, y, x + 20 * w, y + 38)
+      ..close();
 
     _paint.shader = LinearGradient(
       begin: Alignment.bottomCenter,
       end: Alignment.topCenter,
-      colors: main
-          ? [const Color(0xFFFF0000), const Color(0xFFFF6600), const Color(0xFFFFCC00)]
-          : [const Color(0xFFFF3300), const Color(0xFFFF6600), Colors.transparent],
-    ).createShader(Rect.fromLTWH(x - 22, y - h, 44, h + 35));
+      colors: [
+        const Color(0xFFFF2200),
+        const Color(0xFFFF6600),
+        const Color(0xFFFFAA00),
+        Colors.transparent,
+      ],
+      stops: const [0.0, 0.4, 0.75, 1.0],
+    ).createShader(Rect.fromLTWH(x - 30, y - fh, 60, fh + 40));
     canvas.drawPath(path, _paint);
     _paint.shader = null;
   }
 
+  // WALL – vivid red-orange brick wall, highly visible
   void _drawWall(Canvas canvas, double x, double y) {
-    // Wall body
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(x - 36, y - 44, 72, 84),
+      const Radius.circular(4),
+    );
+
+    // Shadow
+    _paint.color = Colors.black.withOpacity(0.5);
+    canvas.save();
+    canvas.translate(5, 7);
+    canvas.drawRRect(rect, _paint);
+    canvas.restore();
+
+    // Wall gradient
     _paint.shader = LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [const Color(0xFF8B7355), const Color(0xFF6B5A45), const Color(0xFF4A3F2F)],
-    ).createShader(Rect.fromLTWH(x - 32, y - 40, 64, 80));
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(x - 32, y - 40, 64, 80), const Radius.circular(4)),
-      _paint,
-    );
+      colors: [const Color(0xFFFF6633), const Color(0xFFCC3300), const Color(0xFF881100)],
+    ).createShader(Rect.fromLTWH(x - 36, y - 44, 72, 84));
+    canvas.drawRRect(rect, _paint);
     _paint.shader = null;
 
-    // Brick pattern
-    _paint.color = Colors.black.withOpacity(0.3);
-    _paint.strokeWidth = 1;
-    _paint.style = PaintingStyle.stroke;
-    for (int row = 0; row < 4; row++) {
-      final by = y - 35 + row * 20;
-      final offset = row.isEven ? 0.0 : 16.0;
-      for (int col = -2; col <= 2; col++) {
-        final bx = x + col * 32 + offset;
-        canvas.drawRect(Rect.fromLTWH(bx - 14, by, 28, 18), _paint);
+    // Bright outline
+    _paint
+      ..color = const Color(0xFFFF9966)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+    canvas.drawRRect(rect, _paint);
+    _paint.style = PaintingStyle.fill;
+
+    // Brick pattern – white mortar lines, very visible
+    _paint
+      ..color = Colors.black.withOpacity(0.5)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    for (int row = 0; row < 5; row++) {
+      final by = y - 40 + row * 17.0;
+      canvas.drawLine(Offset(x - 34, by), Offset(x + 34, by), _paint);
+      final shift = row.isEven ? 0.0 : 18.0;
+      for (double bx = x - 34 + shift; bx < x + 34; bx += 36) {
+        canvas.drawLine(Offset(bx, by), Offset(bx, by + 17), _paint);
       }
     }
     _paint.style = PaintingStyle.fill;
+
+    // Highlight top edge
+    _paint
+      ..color = const Color(0xFFFFAA88)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(Offset(x - 36, y - 44), Offset(x + 36, y - 44), _paint);
+    _paint.style = PaintingStyle.fill;
+
+    _drawObstacleLabel(canvas, x, y - 58, '🧱', const Color(0xFFFF9966));
   }
 
+  // LOG – vivid green/brown, clearly horizontal
   void _drawLog(Canvas canvas, double x, double y) {
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(x - 38, y - 18, 76, 50),
+      const Radius.circular(10),
+    );
+
+    // Shadow
+    _paint.color = Colors.black.withOpacity(0.45);
+    canvas.save();
+    canvas.translate(4, 6);
+    canvas.drawRRect(rect, _paint);
+    canvas.restore();
+
+    // Log body
     _paint.shader = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: [const Color(0xFF8B4513), const Color(0xFF5C3317), const Color(0xFF3D2210)],
-    ).createShader(Rect.fromLTWH(x - 35, y - 20, 70, 55));
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(x - 35, y - 20, 70, 55), const Radius.circular(8)),
-      _paint,
-    );
+      colors: [const Color(0xFFCC8833), const Color(0xFF885522), const Color(0xFF553311)],
+    ).createShader(Rect.fromLTWH(x - 38, y - 18, 76, 50));
+    canvas.drawRRect(rect, _paint);
     _paint.shader = null;
 
-    // Wood grain
-    _paint.color = const Color(0xFF3D2210).withOpacity(0.5);
-    _paint.strokeWidth = 1;
-    _paint.style = PaintingStyle.stroke;
-    for (int i = -2; i <= 2; i++) {
-      canvas.drawLine(Offset(x + i * 12, y - 20), Offset(x + i * 12, y + 35), _paint);
-    }
-    // End caps
-    canvas.drawOval(Rect.fromLTWH(x - 35, y - 28, 70, 20), _paint);
-    canvas.drawOval(Rect.fromLTWH(x - 35, y + 27, 70, 20), _paint);
+    // Bright outline
+    _paint
+      ..color = const Color(0xFFFFBB44)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+    canvas.drawRRect(rect, _paint);
     _paint.style = PaintingStyle.fill;
+
+    // Wood grain lines
+    _paint
+      ..color = const Color(0xFF553311).withOpacity(0.5)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    for (int i = -2; i <= 2; i++) {
+      canvas.drawLine(Offset(x + i * 13, y - 18), Offset(x + i * 13, y + 32), _paint);
+    }
+    _paint.style = PaintingStyle.fill;
+
+    // End caps with rings
+    for (final ex in [x - 30.0, x + 30.0]) {
+      _paint.shader = RadialGradient(
+        colors: [const Color(0xFFDDAA55), const Color(0xFF885522), const Color(0xFF553311)],
+      ).createShader(Rect.fromCircle(center: Offset(ex, y + 7), radius: 18));
+      canvas.drawOval(Rect.fromCenter(center: Offset(ex, y + 7), width: 22, height: 30), _paint);
+      _paint.shader = null;
+      // Tree rings
+      _paint
+        ..color = const Color(0xFF553311).withOpacity(0.4)
+        ..strokeWidth = 1
+        ..style = PaintingStyle.stroke;
+      canvas.drawOval(Rect.fromCenter(center: Offset(ex, y + 7), width: 14, height: 18), _paint);
+      canvas.drawOval(Rect.fromCenter(center: Offset(ex, y + 7), width: 6, height: 8), _paint);
+      _paint.style = PaintingStyle.fill;
+    }
+
+    _drawObstacleLabel(canvas, x, y - 32, '🪵', const Color(0xFFFFBB44));
   }
 
-  void _drawPlayer(Canvas canvas, Size size) {
+  // Warning label above each obstacle
+  void _drawObstacleLabel(Canvas canvas, double x, double y, String emoji, Color color) {
+    // Pulsing warning glow
+    final pulse = (sin(animationValue * 6) + 1) / 2;
+    _paint.color = color.withOpacity(0.2 + pulse * 0.25);
+    canvas.drawCircle(Offset(x, y + 10), 18 + pulse * 4, _paint);
+
+    // Emoji icon
+    _drawEmoji(canvas, emoji, x, y + 10, 20);
+  }
+
+  // ─────────────────────────────────────────────
+  // PLAYER
+  // ─────────────────────────────────────────────
+  void _drawPlayer(Canvas canvas) {
     final px = engine.playerX;
     final py = engine.playerY;
     final isSliding = engine.player.state == PlayerState.sliding;
     final isDead = engine.player.state == PlayerState.dead;
 
-    // Shield effect
+    // Shield aura
     if (engine.player.isShielded) {
       final pulse = (sin(animationValue * 6) + 1) / 2;
-      _paint.color = AppColors.sapphire.withOpacity(0.3 + pulse * 0.2);
-      canvas.drawCircle(
-        Offset(px, py + GameConfig.playerHeight / 2),
-        45 + pulse * 5,
-        _paint,
-      );
+      _paint.shader = RadialGradient(
+        colors: [const Color(0xFF4488FF).withOpacity(0.4 + pulse * 0.2), Colors.transparent],
+      ).createShader(Rect.fromCircle(center: Offset(px, py + 35), radius: 50));
+      canvas.drawCircle(Offset(px, py + 35), 50 + pulse * 6, _paint);
+      _paint.shader = null;
+
+      _paint
+        ..color = const Color(0xFF44AAFF).withOpacity(0.6)
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke;
+      canvas.drawCircle(Offset(px, py + 35), 46, _paint);
+      _paint.style = PaintingStyle.fill;
     }
 
     // Shadow
-    _paint.color = Colors.black.withOpacity(0.4);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(px, engine.groundY - 5),
-        width: isSliding ? 60 : 40,
-        height: isSliding ? 15 : 10,
-      ),
-      _paint,
-    );
+    _paint.color = Colors.black.withOpacity(0.35);
+    canvas.drawOval(Rect.fromCenter(
+      center: Offset(px, _groundY - 4),
+      width: isSliding ? 68 : 40,
+      height: isSliding ? 14 : 9,
+    ), _paint);
 
     if (isSliding) {
       _drawPlayerSliding(canvas, px, py + GameConfig.playerHeight * 0.5);
@@ -457,148 +644,148 @@ class GamePainter extends CustomPainter {
       _drawPlayerRunning(canvas, px, py, isDead);
     }
 
-    // Magnet aura
+    // Magnet field
     if (engine.player.hasMagnet) {
       final pulse = (sin(animationValue * 4) + 1) / 2;
-      _paint.color = AppColors.ruby.withOpacity(0.2 + pulse * 0.1);
-      _paint.style = PaintingStyle.stroke;
-      _paint.strokeWidth = 2;
-      canvas.drawCircle(
-        Offset(px, py + GameConfig.playerHeight / 2),
-        150,
-        _paint,
-      );
+      _paint
+        ..color = const Color(0xFFFF4488).withOpacity(0.15 + pulse * 0.08)
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+      canvas.drawCircle(Offset(px, py + 35), 150, _paint);
+      canvas.drawCircle(Offset(px, py + 35), 100, _paint);
       _paint.style = PaintingStyle.fill;
     }
   }
 
   void _drawPlayerRunning(Canvas canvas, double px, double py, bool isDead) {
-    final legSwing = isDead ? 0.0 : sin(animationValue * 12) * 8;
-
-    // Body (torso)
-    _paint.shader = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [const Color(0xFFE8A020), const Color(0xFFC07010)],
-    ).createShader(Rect.fromLTWH(px - 14, py + 20, 28, 28));
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(px - 14, py + 20, 28, 28), const Radius.circular(5)),
-      _paint,
-    );
-    _paint.shader = null;
+    final leg = sin(animationValue * 12) * (isDead ? 0 : 9);
 
     // Cape
-    final capePath = Path();
-    capePath.moveTo(px - 14, py + 22);
-    capePath.lineTo(px - 24, py + 48 + legSwing);
-    capePath.lineTo(px - 10, py + 45);
-    capePath.close();
     _paint.color = const Color(0xFF8B0000);
-    canvas.drawPath(capePath, _paint);
-
-    // Head
-    _paint.shader = RadialGradient(
-      colors: [const Color(0xFFF4C88A), const Color(0xFFD4A870)],
-      center: const Alignment(-0.3, -0.3),
-    ).createShader(Rect.fromCircle(center: Offset(px, py + 12), radius: 16));
-    canvas.drawCircle(Offset(px, py + 12), 16, _paint);
-    _paint.shader = null;
-
-    // Helmet/hat
-    _paint.color = const Color(0xFF8B6914);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(px - 17, py - 2, 34, 10), const Radius.circular(3)),
-      _paint,
-    );
-    final hatPath = Path();
-    hatPath.moveTo(px - 12, py - 2);
-    hatPath.lineTo(px - 8, py - 18);
-    hatPath.lineTo(px + 8, py - 18);
-    hatPath.lineTo(px + 12, py - 2);
-    _paint.color = const Color(0xFFB8860B);
-    canvas.drawPath(hatPath, _paint);
-
-    // Eyes
-    _paint.color = isDead ? Colors.red : Colors.white;
-    canvas.drawOval(Rect.fromLTWH(px - 9, py + 8, 7, 8), _paint);
-    canvas.drawOval(Rect.fromLTWH(px + 2, py + 8, 7, 8), _paint);
-    _paint.color = isDead ? const Color(0xFF8B0000) : Colors.black87;
-    canvas.drawCircle(Offset(px - 5.5, py + 12), 3, _paint);
-    canvas.drawCircle(Offset(px + 5.5, py + 12), 3, _paint);
-
-    // Arms
-    _paint.color = const Color(0xFFE8A020);
-    _paint.strokeWidth = 7;
-    _paint.strokeCap = StrokeCap.round;
-    _paint.style = PaintingStyle.stroke;
-    canvas.drawLine(Offset(px - 14, py + 26), Offset(px - 26, py + 36 - legSwing), _paint);
-    canvas.drawLine(Offset(px + 14, py + 26), Offset(px + 26, py + 36 + legSwing), _paint);
-    _paint.style = PaintingStyle.fill;
+    final cape = Path()
+      ..moveTo(px - 13, py + 20)
+      ..lineTo(px - 26, py + 48 + leg)
+      ..lineTo(px - 9, py + 42)
+      ..close();
+    canvas.drawPath(cape, _paint);
+    _paint.color = const Color(0xFFAA0000);
+    final capeEdge = Path()
+      ..moveTo(px - 13, py + 20)
+      ..lineTo(px - 26, py + 48 + leg)
+      ..lineTo(px - 20, py + 45)
+      ..close();
+    canvas.drawPath(capeEdge, _paint);
 
     // Legs
     _paint.color = const Color(0xFF4A3520);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(px - 13, py + 46, 11, 26 + legSwing),
-        const Radius.circular(3),
-      ),
-      _paint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(px + 2, py + 46, 11, 26 - legSwing),
-        const Radius.circular(3),
-      ),
-      _paint,
-    );
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(px - 13, py + 46, 11, 26 + leg), const Radius.circular(3)), _paint);
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(px + 2, py + 46, 11, 26 - leg), const Radius.circular(3)), _paint);
 
     // Boots
-    _paint.color = const Color(0xFF2A1A0A);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(px - 16, py + 68 + legSwing, 16, 10),
-        const Radius.circular(3),
-      ),
-      _paint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(px + 1, py + 68 - legSwing, 16, 10),
-        const Radius.circular(3),
-      ),
-      _paint,
-    );
+    _paint.color = const Color(0xFF1A0A00);
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(px - 16, py + 68 + leg, 16, 10), const Radius.circular(3)), _paint);
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(px + 1, py + 68 - leg, 16, 10), const Radius.circular(3)), _paint);
+
+    // Torso
+    _paint.shader = LinearGradient(
+      begin: Alignment.topCenter, end: Alignment.bottomCenter,
+      colors: [const Color(0xFFEEAA22), const Color(0xFFCC8800)],
+    ).createShader(Rect.fromLTWH(px - 14, py + 20, 28, 28));
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(px - 14, py + 20, 28, 28), const Radius.circular(5)), _paint);
+    _paint.shader = null;
+
+    // Belt
+    _paint.color = const Color(0xFF884400);
+    canvas.drawRect(Rect.fromLTWH(px - 14, py + 40, 28, 5), _paint);
+    _paint.color = const Color(0xFFFFDD00);
+    canvas.drawRect(Rect.fromLTWH(px - 4, py + 40, 8, 5), _paint);
+
+    // Arms
+    _paint
+      ..color = const Color(0xFFEEAA22)
+      ..strokeWidth = 8
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(Offset(px - 14, py + 26), Offset(px - 28, py + 38 - leg), _paint);
+    canvas.drawLine(Offset(px + 14, py + 26), Offset(px + 28, py + 38 + leg), _paint);
+    _paint.style = PaintingStyle.fill;
+
+    // Neck
+    _paint.color = const Color(0xFFE8A060);
+    canvas.drawRect(Rect.fromLTWH(px - 5, py + 15, 10, 8), _paint);
+
+    // Head
+    _paint.shader = RadialGradient(
+      center: const Alignment(-0.3, -0.3),
+      colors: [const Color(0xFFF8D090), const Color(0xFFD4A060)],
+    ).createShader(Rect.fromCircle(center: Offset(px, py + 10), radius: 17));
+    canvas.drawCircle(Offset(px, py + 10), 17, _paint);
+    _paint.shader = null;
+
+    // Helmet band
+    _paint.color = const Color(0xFFAA8800);
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(px - 18, py - 3, 36, 11), const Radius.circular(3)), _paint);
+
+    // Hat
+    _paint.color = const Color(0xFFDDAA00);
+    final hat = Path()
+      ..moveTo(px - 14, py - 3)
+      ..lineTo(px - 9, py - 20)
+      ..lineTo(px + 9, py - 20)
+      ..lineTo(px + 14, py - 3);
+    canvas.drawPath(hat, _paint);
+    // Hat tip
+    _paint.color = const Color(0xFFFFCC00);
+    canvas.drawCircle(Offset(px, py - 20), 4, _paint);
+
+    // Eyes
+    _paint.color = isDead ? const Color(0xFFFF2200) : Colors.white;
+    canvas.drawOval(Rect.fromLTWH(px - 10, py + 5, 8, 9), _paint);
+    canvas.drawOval(Rect.fromLTWH(px + 2, py + 5, 8, 9), _paint);
+    _paint.color = isDead ? const Color(0xFF8B0000) : Colors.black87;
+    canvas.drawCircle(Offset(px - 6, py + 9), 3, _paint);
+    canvas.drawCircle(Offset(px + 6, py + 9), 3, _paint);
+    // Eye shine
+    _paint.color = Colors.white.withOpacity(0.8);
+    canvas.drawCircle(Offset(px - 5, py + 7), 1, _paint);
+    canvas.drawCircle(Offset(px + 7, py + 7), 1, _paint);
   }
 
   void _drawPlayerSliding(Canvas canvas, double px, double py) {
+    // Sliding body
     _paint.color = const Color(0xFF4A3520);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(px - 28, py - 12, 56, 20),
-        const Radius.circular(8),
-      ),
-      _paint,
-    );
-    _paint.color = const Color(0xFFE8A020);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(px - 18, py - 22, 36, 16),
-        const Radius.circular(6),
-      ),
-      _paint,
-    );
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(px - 30, py - 10, 60, 18), const Radius.circular(8)), _paint);
+    _paint.shader = LinearGradient(
+      colors: [const Color(0xFFEEAA22), const Color(0xFFCC8800)],
+    ).createShader(Rect.fromLTWH(px - 20, py - 22, 38, 16));
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(px - 20, py - 22, 38, 16), const Radius.circular(6)), _paint);
+    _paint.shader = null;
     // Head
-    _paint.color = const Color(0xFFF4C88A);
-    canvas.drawCircle(Offset(px + 22, py - 15), 13, _paint);
+    _paint.color = const Color(0xFFF8D090);
+    canvas.drawCircle(Offset(px + 24, py - 14), 13, _paint);
+    _paint.color = const Color(0xFFAA8800);
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(px + 12, py - 24, 24, 8), const Radius.circular(3)), _paint);
   }
 
+  // ─────────────────────────────────────────────
+  // PARTICLES
+  // ─────────────────────────────────────────────
   void _drawParticles(Canvas canvas) {
     for (final p in engine.particles) {
       _paint.color = p.color.withOpacity(p.opacity);
-      canvas.drawCircle(Offset(p.x, p.y), p.size, _paint);
+      canvas.drawCircle(Offset(p.x, p.y), p.size.clamp(1, 8), _paint);
     }
   }
 
   @override
-  bool shouldRepaint(GamePainter oldDelegate) => true;
+  bool shouldRepaint(GamePainter old) => true;
 }

@@ -33,10 +33,10 @@ class GameConfig {
   static const double gravity = 1200.0;
 
   // Obstacle
-  static const double obstacleWidth = 60.0;
-  static const double obstacleHeight = 80.0;
-  static const double obstacleSpawnInterval = 2.0;
-  static const double minSpawnInterval = 0.8;
+  static const double obstacleWidth = 76.0;
+  static const double obstacleHeight = 90.0;
+  static const double obstacleSpawnInterval = 2.2;
+  static const double minSpawnInterval = 1.0;
 
   // Coin
   static const double coinSize = 30.0;
