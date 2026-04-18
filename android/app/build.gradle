@@ -26,8 +26,8 @@ android {
         applicationId "com.example.temple_dash"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
-        versionCode flutter.versionCode
-        versionName flutter.versionName
+        versionCode 1
+        versionName "1.0.0"
     }
 
     buildTypes {
@@ -35,6 +35,13 @@ android {
             signingConfig signingConfigs.debug
             minifyEnabled false
             shrinkResources false
+        }
+    }
+
+    // Build a single universal APK (all ABIs in one file)
+    splits {
+        abi {
+            enable false
         }
     }
 }

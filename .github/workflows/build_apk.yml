@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: Build Release APK
+    name: Build Universal APK
     runs-on: ubuntu-latest
 
     steps:
@@ -32,31 +32,18 @@ jobs:
       - name: 📦 Get Flutter dependencies
         run: flutter pub get
 
-      - name: 🔍 Analyze code
-        run: flutter analyze --no-fatal-infos
-        continue-on-error: true
+      - name: 🚀 Build Universal Release APK
+        run: flutter build apk --release --no-shrink
 
-      - name: 🏗️ Build Debug APK
-        run: flutter build apk --debug
-
-      - name: 🚀 Build Release APK
-        run: flutter build apk --release
-
-      - name: 📤 Upload Debug APK
+      - name: 📤 Upload Universal APK
         uses: actions/upload-artifact@v4
         with:
-          name: temple-dash-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 30
-
-      - name: 📤 Upload Release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: temple-dash-release-apk
+          name: temple-dash-universal-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 90
 
-      - name: 📊 Show APK info
+      - name: 📊 APK Info
         run: |
           echo "=== Build Complete ==="
           ls -lh build/app/outputs/flutter-apk/
+          echo "Size: $(du -sh build/app/outputs/flutter-apk/app-release.apk | cut -f1)"
